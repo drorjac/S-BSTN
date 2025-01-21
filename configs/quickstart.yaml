@@ -1,0 +1,45 @@
+# Quickstart: a 12-link chain and 14 days of simulated 10 s data. Trains on a
+# laptop CPU in a few minutes. Same pipeline as base.yaml, smaller everything.
+sim:
+  n_links: 12
+  topology: chain
+  extent_km: 30.0
+  field_mode: advect
+  storm_speed_km_min: 0.5
+  storm_dir_deg: 0.0
+  spawn_per_hour: 0.12
+  duration_min: 20160    # 14 days
+  dt_s: 10.0
+  quantization_dB: 0.3
+  noise_sigma_dB: 0.1
+  horizon_min: 5.0
+
+data:
+  downsample: 3          # 10 s -> 30 s
+  window: 60
+  s: 0.012
+  pre: 20
+  post: 40
+  T: 24                  # 12 min of history
+  H: 10                  # 5 min ahead
+  max_windows: 1200
+
+model:
+  hidden: 32
+  q_e: 32
+  q_d: 32
+  spatial_reduce: rowsum
+  tau_init_frac: 0.5
+  tau_temperature: 0.01
+  learn_tau: true
+  keep_self: false
+
+train:
+  epochs: 60
+  patience: 10
+  batch_size: 64
+  lr: 0.003
+  weight_decay: 0.00001
+  loss_reduction: mean
+  seed: 0
+  device: auto

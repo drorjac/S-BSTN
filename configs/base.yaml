@@ -1,0 +1,66 @@
+# Default experiment: 16-link chain, 30 days of simulated 10 s CML data,
+# 12 min of history (T=24 at 30 s) -> 5 min forecast (H=10).
+# Loaded by sbstn.config.load().
+sim:
+  n_links: 16
+  topology: chain        # chain | ring | tree | random
+  extent_km: 30.0
+  field_mode: advect     # run `independent` FIRST as the integrity check
+  storm_speed_km_min: 0.5
+  storm_dir_deg: 0.0
+  # Calibrated so the RAW wet fraction is ~2%, matching the paper's 1.8-2.3%.
+  # Higher rates rain so often that wet-dry balancing becomes a no-op.
+  # See simulate.SimConfig.
+  spawn_per_hour: 0.08
+  duration_min: 43200    # 30 days
+  dt_s: 10.0
+  quantization_dB: 0.3
+  noise_sigma_dB: 0.1
+  horizon_min: 5.0       # only used to build Lambda*, = H(10) * 30 s
+
+data:
+  downsample: 3          # 10 s -> 30 s
+  window: 60             # rolling-std window S, paper does not give this
+  # Quantile for the rolling-std wet detector. Tuned so the POST-BALANCING wet
+  # fraction is 0.360, inside the paper's 33-44% band. s = 0.02 yields
+  # 0.245 - outside the band - because s sets the
+  # detector's flag rate, not the true wet fraction. Full margins are kept.
+  s: 0.012
+  pre: 20
+  post: 40               # covers wet-antenna decay
+  T: 24
+  H: 10                  # 5 min at 30 s
+  embargo: null          # null -> T + H; purges windows straddling a split
+  max_windows: 1200      # equalise dataset size and cost across scenarios
+
+model:
+  # 32 sits inside the paper's grid {16,32,64,128,256}. Chosen over 64 on
+  # measured cost: the SCA intermediate is (B,N,N,Q_e) and is retained for
+  # backward at every step of both directions, so halving q_e halves the
+  # dominant tensor, and 64 made the sweep grid infeasible (74 s/epoch at
+  # N=16 on one thread, 441 s/epoch at N=40).
+  hidden: 32
+  q_e: 32
+  q_d: 32
+  spatial_reduce: rowsum # rowsum | flatten
+  tau_init_frac: 0.5     # -> tau0 = 0.5/N, BELOW uniform 1/N
+  tau_temperature: 0.01
+  learn_tau: true
+  keep_self: false
+
+train:
+  # 40 epochs at lr 1e-3 left every arm still improving at the cap - val loss
+  # monotonically decreasing, early stopping never firing. Under those
+  # settings S-BSTN lost to persistence at every horizon. At lr 3e-3 with a
+  # real patience budget it converges in 60-90 epochs and beats persistence by
+  # 24% at the 5-minute horizon. Same protocol for every arm.
+  epochs: 150
+  patience: 15
+  batch_size: 64
+  lr: 0.003
+  weight_decay: 0.00001
+  loss_reduction: mean   # `sum` is paper-faithful but scales with N
+  teacher_forcing_ratio: 0.0
+  optimizer: adam
+  seed: 0
+  device: auto
