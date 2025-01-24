@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sbstn"
+version = "1.0.0"
+description = "S-BSTN: Selective Bidirectional Spatio-Temporal Network for forecasting weather-induced attenuation in commercial microwave link networks"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Dror Jacoby" }]
+requires-python = ">=3.10"
+keywords = [
+  "commercial microwave links", "rain attenuation", "spatio-temporal forecasting",
+  "attention", "opportunistic sensing", "ISAC", "pytorch",
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Atmospheric Science",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "torch>=2.0",
+  "numpy>=1.24",
+  "pyyaml>=6.0",
+  "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[project.scripts]
+sbstn = "sbstn.cli:main"
+
+[project.urls]
+Paper = "https://doi.org/10.1109/TIM.2025.3555716"
+
+[tool.setuptools.packages.find]
+include = ["sbstn*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: simulates a full 30-day scenario (deselect with -m 'not slow')"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "E702", "E731", "E741", "E402"]
