@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.idea/
+.vscode/
+.DS_Store
+
+# Outputs (regenerate with the CLI)
+/runs/
+/data/
+*.pt
+*.npz
+!examples/*.npz
+
+# ITU-R P.838-3 table: transcribe locally, see sbstn/data/itu_r_838.py
+sbstn/data/itu_r_838_coeffs.json
+
+# Local notes
+notes/

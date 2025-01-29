@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "S-BSTN: Selective Bidirectional Spatio-Temporal Network"
+version: 1.0.0
+date-released: 2025-01-31
+license: MIT
+authors:
+  - family-names: Jacoby
+    given-names: Dror
+    orcid: "https://orcid.org/0000-0003-0493-2828"
+preferred-citation:
+  type: article
+  title: "Spatio-Temporal Model for Predicting Multivariate Weather-Induced Attenuation in Wireless Networks"
+  authors:
+    - family-names: Jacoby
+      given-names: Dror
+      orcid: "https://orcid.org/0000-0003-0493-2828"
+    - family-names: Messer
+      given-names: Hagit
+      orcid: "https://orcid.org/0000-0002-6378-3538"
+    - family-names: Ostrometzky
+      given-names: Jonatan
+      orcid: "https://orcid.org/0000-0003-4750-8656"
+  journal: "IEEE Transactions on Instrumentation and Measurement"
+  volume: 74
+  start: 1
+  end: 13
+  year: 2025
+  doi: "10.1109/TIM.2025.3555716"
