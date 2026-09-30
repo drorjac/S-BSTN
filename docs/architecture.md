@@ -37,7 +37,7 @@ flowchart LR
 | `x_t^{(i)}` | attenuation of link `i` at step `t`, dB (`TSL − RSL`) | scalar |
 | `X`, `Y` | input window / target window | `N×T`, `N×H` |
 | `Λ_t` | spatial attention at step `t`, row `i` = distribution over sources `j` | `N×N` |
-| `τ` | per-target selection threshold | `N`, each in (0, 1) |
+| `τ` | per-target selection threshold | `N`, each in (0, 1) (`absolute`) or (0, 2/N) (`uniform`) |
 | `π_{t'}` | temporal attention for forecast step `t'` | `T` |
 
 ## 1. Selective cross-attention (SCA): *which links matter to which*
@@ -122,8 +122,9 @@ z_{t'}     = Σ_t π_{t'}^{t} h^{(e)}_t
 z̃_{t'}     = tanh( W [z→_{t'}; z←_{t'}] + b )
 ```
 
-The two directions are fused **once**, at the context vector. The ablation variant V2 tests
-what is lost by merging them earlier. `U_d` is `Q_d × M`, so that `U_d h` lands in `ℝ^{Q_d}`.
+The two directions are fused **once**, at the context vector. The ablation variant V2
+removes temporal attention entirely: its context is the fused final encoder states, constant
+across `t'`. `U_d` is `Q_d × M`, so that `U_d h` lands in `ℝ^{Q_d}`.
 
 Code: [`sbstn/models/bita.py`](../sbstn/models/bita.py).
 

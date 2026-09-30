@@ -37,8 +37,10 @@ class TemporalAttention(nn.Module):
 class BiTA(nn.Module):
     """Per-direction temporal attention, fused once by a single FC layer.
 
-    That single late fusion is the point: merging the directions earlier is
-    exactly ablation variant V2.
+    That single late fusion is the point: each direction keeps its own
+    per-forecast-step distribution over the encoder states, and they meet
+    only at the context vector. Ablation variant V2 removes this module
+    entirely (LastStateContext below).
     """
 
     def __init__(self, hidden: int, q_d: int, *, bidirectional: bool = True):

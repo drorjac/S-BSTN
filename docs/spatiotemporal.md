@@ -77,8 +77,8 @@ should recover.
 This is also why the ablations are informative:
 
 - **V3** (no SAN) keeps pairwise attention but cannot drop far-away links.
-- **V1** (no spatial attention) reduces the network to a set of univariate forecasts that
-  share an LSTM.
+- **V1** (no spatial attention) feeds the raw `N`-vector straight into the LSTM, so links
+  can no longer be weighted pairwise or pruned.
 - **V4** (forward only) loses the backward view of onset and decay.
 
 In the paper, the benefit of SAN depends on geometry. It helps on the larger, spatially

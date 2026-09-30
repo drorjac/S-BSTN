@@ -331,6 +331,12 @@ def simulate(cfg: SimConfig, observations: bool = True) -> dict:
     `observations=False` skips the observation model and returns only the rain
     ground truth - used by calibrate_spawn_rate, which only needs wet_mask.
     """
+    valid_modes = ("advect", "static", "uniform", "independent",
+                   "var", "seasonal", "frontal", "multiscale")
+    if cfg.field_mode not in valid_modes:
+        raise ValueError(
+            f"unknown field_mode {cfg.field_mode!r}, have {valid_modes}")
+
     g_rng = np.random.default_rng(cfg.seed_geometry)
     f_rng = np.random.default_rng(cfg.seed_field)
     n_rng = np.random.default_rng(cfg.seed_noise)
@@ -413,6 +419,12 @@ def simulate(cfg: SimConfig, observations: bool = True) -> dict:
     x = np.round(x / cfg.quantization_dB) * cfg.quantization_dB
 
     lam_star, lag_star = reference_influence(links, cfg)
+    if cfg.field_mode == "independent":
+        # No shared field, so the true coupling is the identity and there is
+        # no lead-lag. Returning the geometric advection proxy here would
+        # score attention recovery against structure that does not exist.
+        lam_star = np.eye(N, dtype=np.float32)
+        lag_star = np.zeros((N, N), dtype=np.float32)
     if var_A is not None:
         # The VAR coefficient matrix is the ground-truth influence by
         # construction, so use it directly rather than the geometric proxy.

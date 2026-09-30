@@ -62,9 +62,13 @@ def test_backward_states_in_real_time_order():
 
 
 def test_eval_path_never_reads_Y():
+    """Y must not influence eval output, even with teacher forcing requested."""
     m = mk().eval()
+    X = torch.randn(2, 7, 24)
     with torch.no_grad():
-        m(torch.randn(2, 7, 24), Y=None)
+        base = m(X, Y=None)
+        forced = m(X, Y=torch.full((2, 7, 10), 1e6), teacher_forcing_ratio=1.0)
+    assert torch.equal(base, forced)
 
 
 @pytest.mark.parametrize("v", sorted(VARIANTS))

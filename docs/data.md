@@ -25,8 +25,10 @@ used as inputs.
 1. **Causal downsampling**, `data.downsample` (10 s → 30 s by default). This is a
    backward-looking moving average, because a centred window would leak the future.
 2. **Wet/dry classification** using the rolling standard deviation over `data.window`
-   samples, thresholded at the `1 − s` quantile. The threshold is fitted on the training
-   portion only.
+   samples, thresholded at the `1 − s` quantile. The threshold is fitted on the first 75%
+   of the record, which corresponds to the training period. (The subsequent 75/15/10 split
+   is over kept windows, so the two boundaries coincide only approximately; the fit never
+   uses the final quarter of the record, where the test set lives.)
 3. **Wet–dry balancing.** If *any* link is wet over `[t₁, t₂]`, the interval
    `[t₁ − pre, t₂ + post]` is kept for *all* links. The post margin captures wet-antenna
    decay. This raises the wet fraction from about 2% in raw records to about 35–40%.
@@ -75,10 +77,13 @@ sbstn train --data data/tree34.npz --out runs/tree34
 
 ### ITU-R P.838-3 coefficients
 
-By default the simulator and the rain-map module use a **placeholder** power law (`k = 0.1`,
-`α = 1`) that does not depend on frequency. Forecasting in dB is unaffected, but rain rates in
-mm/h are only illustrative. To use the real frequency- and polarisation-dependent law,
-transcribe Tables 1–4 of Recommendation ITU-R P.838-3 into
-`sbstn/data/itu_r_838_coeffs.json`. The expected format is documented in
-[`itu_r_838.py`](../sbstn/data/itu_r_838.py). The tables are not bundled, so that the numbers
-always come from the official recommendation.
+The **simulator** always generates attenuation with a **placeholder** power law (`k = 0.1`,
+`α = 1`, frequency-independent; `sim.pl_k`, `sim.pl_alpha`). Forecasting in dB is unaffected,
+but rain rates in mm/h are only illustrative. The **rain-map evaluation** switches to the real
+frequency- and polarisation-dependent law once Tables 1–4 of Recommendation ITU-R P.838-3 are
+transcribed into `sbstn/data/itu_r_838_coeffs.json` (format documented in
+[`itu_r_838.py`](../sbstn/data/itu_r_838.py)). The tables are not bundled, so that the numbers
+always come from the official recommendation. Note that on *simulated* data the placeholder
+forward law and the P.838-3 inverse would then disagree, so keep the coefficient file absent
+when validating the pipeline on the simulator, and present when mapping real-network
+attenuation to rain.

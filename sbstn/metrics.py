@@ -29,10 +29,16 @@ def tnerror(m: dict) -> dict:
     return {k: float(v.mean()) for k, v in m.items()}
 
 
-def report(y, yhat, steps=(2, 6, 10), dt_min=0.5):
-    """Per-horizon table at the paper's 1 / 3 / 5 min marks, plus TNERROR."""
+def report(y, yhat, steps=None, dt_min=0.5):
+    """Per-horizon table at the paper's 1 / 3 / 5 min marks, plus TNERROR.
+
+    `steps` defaults to the indices closest to 1, 3 and 5 minutes at the
+    given `dt_min`; marks beyond the horizon are dropped.
+    """
     if len(y) == 0:
         return {}
+    if steps is None:
+        steps = sorted({max(1, round(mark / dt_min)) for mark in (1.0, 3.0, 5.0)})
     m = per_horizon(y, yhat)
     rows = {}
     H = len(next(iter(m.values())))

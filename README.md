@@ -62,7 +62,7 @@ details.
 ## Installation
 
 ```bash
-git clone https://github.com/<user>/S-BSTN.git
+git clone https://github.com/drorjac/S-BSTN.git
 cd S-BSTN
 pip install -e .            # or: pip install -e ".[dev]" for tests and linting
 ```
@@ -84,7 +84,7 @@ Each training run writes:
 
 ```
 runs/quickstart/
-  sbstn.pt                 checkpoint: weights, scaler, config, link geometry
+  sbstn.pt                 checkpoint: weights, scaler, model config, link geometry
   results.json             config, data diagnostics, per-horizon test metrics, training history
   test_predictions.npz     test windows, truth and forecasts in dB
   figures/                 network, rain event, spatio-temporal structure, attention maps, training curves

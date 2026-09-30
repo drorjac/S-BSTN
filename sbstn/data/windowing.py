@@ -47,9 +47,13 @@ def wet_dry(x: np.ndarray, window: int = 60, s: float = 0.02,
     Uses only network data - no external calibration, no gauge.
 
     `fit_frac` bounds the portion of the record used to estimate the quantile
-    threshold. sigma_0 is the 1-s quantile over the TRAINING portion only;
-    taking it over the whole record would leak test-period statistics into a
-    decision that determines which samples become training data at all.
+    threshold. sigma_0 is the 1-s quantile over the first `fit_frac` of the
+    record - the training period - because taking it over the whole record
+    would leak test-period statistics into a decision that determines which
+    samples become training data at all. (The chronological split is over
+    kept windows, so its time boundary matches this prefix only
+    approximately; the fit never touches the final quarter of the record,
+    where the test set lives.)
     """
     sd = rolling_std(x, window)
     cut = max(1, int(sd.shape[1] * fit_frac))

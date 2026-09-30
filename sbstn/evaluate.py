@@ -20,13 +20,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from .data.itu_r_838 import coefficients_available, k_alpha
+from .data.itu_r_838 import coefficients_available, k_alpha, rain_from_attenuation
 
 
 def link_rain_rate(A_dB, lengths_km, k=0.1, alpha=1.0):
     """Invert gamma = k R^alpha over each link path. A_dB: (..., N)."""
-    gamma = np.maximum(np.asarray(A_dB, float), 0.0) / np.maximum(lengths_km, 1e-9)
-    return np.power(gamma / k, 1.0 / alpha)
+    return rain_from_attenuation(A_dB, lengths_km, k, alpha)
 
 
 def coefficients_for(links, cfg) -> tuple[np.ndarray, np.ndarray]:

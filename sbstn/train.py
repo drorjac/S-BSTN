@@ -28,9 +28,10 @@ def pick_device(requested: str = "auto") -> torch.device:
     if r in ("auto", "best", "gpu"):
         if torch.cuda.is_available():
             return torch.device("cuda")
-        # MPS is available on this hardware but is SLOWER here: the encoder is
-        # a Python loop over T steps with small per-step kernels, so launch
-        # overhead dominates and CPU wins for these model sizes.
+        # MPS is deliberately not auto-selected: the encoder is a Python loop
+        # over T steps with small per-step kernels, so launch overhead
+        # dominates and CPU is usually faster at these model sizes. Pass
+        # `train.device=mps` to opt in.
         return torch.device("cpu")
     return torch.device(r)
 
@@ -139,8 +140,14 @@ def _sca_modules(model):
 
 
 def run(variant: str, X, Y, wet_flag, starts, *, cfg: ExperimentConfig,
-        verbose=False):
-    """Train one arm and evaluate it. Returns a result dict."""
+        dt_min: float | None = None, verbose=False):
+    """Train one arm and evaluate it. Returns a result dict.
+
+    `dt_min` is the step duration in minutes, used only to label the
+    per-horizon metric rows; when None it is derived from the sim config.
+    """
+    if dt_min is None:
+        dt_min = cfg.sim.dt_s * cfg.data.downsample / 60.0
     tc, mc, dc = cfg.train, cfg.model, cfg.data
     torch.manual_seed(tc.seed)
     np.random.seed(tc.seed)
@@ -217,9 +224,26 @@ def run(variant: str, X, Y, wet_flag, starts, *, cfg: ExperimentConfig,
 
     model.eval()
     preds = []
+    # Attention statistics are accumulated over ALL test batches. Reading
+    # model.last_attn once after the loop would report the final batch only,
+    # which can be a small remainder.
+    lam_sum, pi_sum, n_attn = None, None, 0
+    err_sum, spars_sum = 0.0, 0.0
     with torch.no_grad():
         for k in range(0, len(te), 256):
-            preds.append(model(t(Xs[te[k:k + 256]])).cpu().numpy())
+            xb = t(Xs[te[k:k + 256]])
+            preds.append(model(xb).cpu().numpy())
+            attn = getattr(model, "last_attn", None)
+            if attn and attn.get("lambda_fwd") is not None:
+                b = xb.shape[0]
+                lam_b = attn["lambda_fwd"].mean(1).sum(0)          # (N, N)
+                lam_sum = lam_b if lam_sum is None else lam_sum + lam_b
+                if attn.get("pi_fwd") is not None:
+                    pi_b = attn["pi_fwd"].sum(0)                   # (H, T)
+                    pi_sum = pi_b if pi_sum is None else pi_sum + pi_b
+                err_sum += attn["empty_row_rate"] * b
+                spars_sum += attn["sparsity"] * b
+                n_attn += b
     pred = np.concatenate(preds) if preds else np.zeros((0, N, H), np.float32)
 
     # METRICS IN dB - invert the scaling first.
@@ -230,22 +254,20 @@ def run(variant: str, X, Y, wet_flag, starts, *, cfg: ExperimentConfig,
         params=int(n_par),
         epochs_run=len(history["val_loss"]),
         seconds=round(time.time() - t_start, 1),
-        metrics=M.split_wet_dry(y_db, p_db, wet_flag[te]),
+        metrics=M.split_wet_dry(y_db, p_db, wet_flag[te], dt_min=dt_min),
         history=history,
     )
     # Test-set truth and forecasts in dB, so downstream evaluation (the rain-map
     # module) runs against the trained model rather than retraining one.
     out["_arrays"] = dict(x_db=X[te], y_db=y_db, pred_db=p_db, wet=wet_flag[te])
 
-    if variant != "persistence" and getattr(model, "last_attn", None):
-        lam = model.last_attn.get("lambda_fwd")
-        if lam is not None:
-            out["lambda_mean"] = lam.mean((0, 1)).cpu().numpy()
-            out["empty_row_rate"] = float(model.last_attn["empty_row_rate"])
-            out["sparsity"] = float(model.last_attn["sparsity"])
-            pi = model.last_attn.get("pi_fwd")
-            if pi is not None:
-                out["pi_mean"] = pi.mean(0).cpu().numpy()
+    if variant != "persistence" and n_attn > 0:
+        out["lambda_mean"] = (lam_sum / n_attn).cpu().numpy()
+        out["empty_row_rate"] = err_sum / n_attn
+        out["sparsity"] = spars_sum / n_attn
+        if pi_sum is not None:
+            out["pi_mean"] = (pi_sum / n_attn).cpu().numpy()
+    if variant != "persistence":
         scas = _sca_modules(model)
         if scas:
             out["tau"] = scas[0].tau.detach().cpu().numpy()

@@ -87,6 +87,15 @@ def cmd_train(args):
     from .forecaster import Forecaster
     from .train import build_dataset, build_dataset_from_array, model_kwargs, run
 
+    from .models.sbstn import VARIANTS
+    if args.variant not in VARIANTS:
+        raise SystemExit(f"--variant must be one of {sorted(VARIANTS)}, "
+                         f"got {args.variant!r}")
+    for b in args.baselines:
+        if b not in VARIANTS and b != "persistence":
+            raise SystemExit(f"--baselines accepts {sorted(VARIANTS) + ['persistence']}, "
+                             f"got {b!r}")
+
     cfg = _config(args)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -114,7 +123,8 @@ def cmd_train(args):
     arms = [args.variant] + list(args.baselines)
     model_out = None
     for arm in dict.fromkeys(arms):
-        r, model = run(arm, X, Y, wet, starts, cfg=cfg, verbose=args.verbose)
+        r, model = run(arm, X, Y, wet, starts, cfg=cfg, dt_min=dt_min,
+                       verbose=args.verbose)
         arrays = r.pop("_arrays")
         lam = r.pop("lambda_mean", None)
         pi = r.pop("pi_mean", None)
