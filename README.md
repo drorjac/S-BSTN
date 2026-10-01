@@ -73,7 +73,7 @@ encoder's step-by-step loop means that a CPU is usually as fast.
 ## Quick start
 
 ```bash
-# simulate a 12-link CML network, train S-BSTN, save the checkpoint and figures (~2 min on CPU)
+# simulate a 16-link CML network, train S-BSTN, save the checkpoint and figures (~7 min on CPU)
 sbstn train --config configs/quickstart.yaml --out runs/quickstart
 
 sbstn info    --checkpoint runs/quickstart/sbstn.pt
@@ -106,8 +106,14 @@ sbstn train --config configs/base.yaml \
 |---|---|
 | `data` | `T` (history steps), `H` (forecast steps), `downsample` (10 s → 30 s), wet/dry detector `window` and `s`, balancing margins `pre`/`post` |
 | `model` | `hidden`, `q_e`, `q_d`; SAN `tau_init_frac`, `tau_temperature`, `learn_tau`, `tau_scale`; `spatial_reduce` (`rowsum` \| `flatten`); `chunk_size` for large N |
-| `train` | `epochs`, `patience`, `lr`, `batch_size`, `weight_decay`, `optimizer` (`adam` \| `sgd`), `device` (`auto` \| `cpu` \| `cuda`), `seed` |
+| `train` | `epochs`, `patience`, `lr`, `batch_size`, `weight_decay`, `optimizer` (`adam` \| `sgd`), `device` (`auto` \| `gpu` \| `cpu` \| `cuda` \| `mps`), `seed` |
 | `sim` | synthetic network: `n_links`, `topology`, `extent_km`, storm speed/direction, `field_mode` |
+
+**GPU.** `train.device=auto` (the default) uses CUDA when it is available. On Apple
+Silicon it switches to MPS only for networks of 32 links or more: below that, CPU is faster,
+because the encoder runs many small per-step kernels. Use `--set train.device=gpu` to force
+the GPU (CUDA, else MPS), or `cpu` / `cuda` / `mps` to pick one explicitly. At inference,
+use `sbstn predict --device ...` or `Forecaster.load(path, device=...)`.
 
 To train one of the ablation variants from the paper, pass `--variant`, for example
 `--variant S-BSTN-V3` for S-BSTN without SAN pruning. The full list is in

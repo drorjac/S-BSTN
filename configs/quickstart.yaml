@@ -1,9 +1,11 @@
-# Quickstart: a 12-link chain and 14 days of simulated 10 s data. Trains on a
-# laptop CPU in a few minutes. Same pipeline as base.yaml, smaller everything.
+# Quickstart: a 16-link chain over 45 km and 14 days of simulated 10 s data,
+# the regime S-BSTN is designed for. Links are ~3 km apart and storms move at
+# 30 km/h, so upwind links lead downwind ones by a few minutes - inside the
+# 5-minute horizon. Trains in about 7 minutes on a laptop CPU.
 sim:
-  n_links: 12
+  n_links: 16
   topology: chain
-  extent_km: 30.0
+  extent_km: 45.0
   field_mode: advect
   storm_speed_km_min: 0.5
   storm_dir_deg: 0.0
@@ -35,8 +37,8 @@ model:
   keep_self: false
 
 train:
-  epochs: 60
-  patience: 10
+  epochs: 150
+  patience: 20
   batch_size: 64
   lr: 0.003
   weight_decay: 0.00001

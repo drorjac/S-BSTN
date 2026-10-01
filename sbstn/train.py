@@ -23,15 +23,36 @@ from .models.baselines import Persistence
 from . import metrics as M
 
 
-def pick_device(requested: str = "auto") -> torch.device:
+# MPS (Apple GPU) only pays off on larger networks: the encoder is a Python
+# loop over T steps with small per-step kernels, so launch overhead dominates
+# at small N. Measured on an M2 (S-BSTN, benchmark config, batch 64):
+# N=16 CPU 175 ms vs MPS 410 ms; N=32 619 vs 485; N=64 3034 vs 1520.
+MPS_MIN_SENSORS = 32
+
+
+def _mps_ok() -> bool:
+    return getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available()
+
+
+def pick_device(requested: str = "auto", n_sensors: int | None = None) -> torch.device:
+    """auto: CUDA if present, else MPS for N >= MPS_MIN_SENSORS, else CPU.
+    gpu: CUDA, else MPS, else CPU with a warning. Anything else is passed to
+    torch.device as-is (cpu, cuda, cuda:1, mps).
+    """
     r = (requested or "auto").lower()
-    if r in ("auto", "best", "gpu"):
+    if r in ("auto", "best"):
         if torch.cuda.is_available():
             return torch.device("cuda")
-        # MPS is deliberately not auto-selected: the encoder is a Python loop
-        # over T steps with small per-step kernels, so launch overhead
-        # dominates and CPU is usually faster at these model sizes. Pass
-        # `train.device=mps` to opt in.
+        if _mps_ok() and n_sensors is not None and n_sensors >= MPS_MIN_SENSORS:
+            return torch.device("mps")
+        return torch.device("cpu")
+    if r == "gpu":
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if _mps_ok():
+            return torch.device("mps")
+        import warnings
+        warnings.warn("device='gpu' requested but neither CUDA nor MPS is available; using CPU")
         return torch.device("cpu")
     return torch.device(r)
 
@@ -154,7 +175,9 @@ def run(variant: str, X, Y, wet_flag, starts, *, cfg: ExperimentConfig,
 
     S, N, T = X.shape
     H = Y.shape[-1]
-    device = pick_device(tc.device)
+    device = pick_device(tc.device, n_sensors=N)
+    if verbose:
+        print(f"[{variant}] device: {device}")
     # Embargo on real time, not window index: consecutive windows overlap by
     # T+H-1 steps, so adjacent windows either side of a split boundary share
     # nearly all their samples.
@@ -227,7 +250,7 @@ def run(variant: str, X, Y, wet_flag, starts, *, cfg: ExperimentConfig,
     # Attention statistics are accumulated over ALL test batches. Reading
     # model.last_attn once after the loop would report the final batch only,
     # which can be a small remainder.
-    lam_sum, pi_sum, n_attn = None, None, 0
+    lam_sum, pi_sum, pib_sum, n_attn = None, None, None, 0
     err_sum, spars_sum = 0.0, 0.0
     with torch.no_grad():
         for k in range(0, len(te), 256):
@@ -241,6 +264,9 @@ def run(variant: str, X, Y, wet_flag, starts, *, cfg: ExperimentConfig,
                 if attn.get("pi_fwd") is not None:
                     pi_b = attn["pi_fwd"].sum(0)                   # (H, T)
                     pi_sum = pi_b if pi_sum is None else pi_sum + pi_b
+                if attn.get("pi_bwd") is not None:
+                    pib_b = attn["pi_bwd"].sum(0)                  # (H, T)
+                    pib_sum = pib_b if pib_sum is None else pib_sum + pib_b
                 err_sum += attn["empty_row_rate"] * b
                 spars_sum += attn["sparsity"] * b
                 n_attn += b
@@ -267,6 +293,8 @@ def run(variant: str, X, Y, wet_flag, starts, *, cfg: ExperimentConfig,
         out["sparsity"] = spars_sum / n_attn
         if pi_sum is not None:
             out["pi_mean"] = (pi_sum / n_attn).cpu().numpy()
+        if pib_sum is not None:
+            out["pi_bwd_mean"] = (pib_sum / n_attn).cpu().numpy()
     if variant != "persistence":
         scas = _sca_modules(model)
         if scas:
@@ -297,6 +325,9 @@ def run_scenario(cfg: ExperimentConfig, arms=("persistence", "LSTM-ED", "STANN",
         pi = r.pop("pi_mean", None)
         if pi is not None and out_dir:
             np.save(Path(out_dir) / f"pi_{a}.npy", pi)
+        pib = r.pop("pi_bwd_mean", None)
+        if pib is not None and out_dir:
+            np.save(Path(out_dir) / f"pi_bwd_{a}.npy", pib)
         arrays = r.pop("_arrays", None)
         if arrays is not None and out_dir:
             np.savez_compressed(Path(out_dir) / f"pred_{a}.npz", **arrays)

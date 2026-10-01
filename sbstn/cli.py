@@ -128,6 +128,7 @@ def cmd_train(args):
         arrays = r.pop("_arrays")
         lam = r.pop("lambda_mean", None)
         pi = r.pop("pi_mean", None)
+        r.pop("pi_bwd_mean", None)
         tau = r.pop("tau", None)
         if tau is not None:
             r["tau_final"] = tau.tolist()
@@ -189,7 +190,7 @@ def cmd_train(args):
 
 def cmd_predict(args):
     from .forecaster import Forecaster
-    fc = Forecaster.load(args.checkpoint)
+    fc = Forecaster.load(args.checkpoint, device=args.device)
     p = Path(args.input)
     x = np.load(p)
     if isinstance(x, np.lib.npyio.NpzFile):
@@ -252,6 +253,7 @@ def main(argv=None):
     p.add_argument("--input", required=True, help=".npy (N, T) or (B, N, T) in dB, or .npz")
     p.add_argument("--key", default="x", help="array name inside an .npz input")
     p.add_argument("--out", help=".npy output path (prints if omitted)")
+    p.add_argument("--device", default="cpu", help="cpu | cuda | mps")
     p.set_defaults(fn=cmd_predict)
 
     p = sub.add_parser("info", help="describe a checkpoint")

@@ -171,3 +171,13 @@ def test_uniform_tau_scale_is_bounded_by_twice_uniform():
     with torch.no_grad():
         m.encoder.fwd.sca.tau_raw.fill_(20.0)        # saturate the sigmoid
     assert float(m.encoder.fwd.sca.tau.max()) <= 2.0 / N + 1e-6
+
+
+def test_pick_device():
+    from sbstn.train import pick_device
+    assert pick_device("cpu").type == "cpu"
+    if not torch.cuda.is_available():
+        assert pick_device("auto", n_sensors=8).type == "cpu"     # small N stays on CPU
+        if torch.backends.mps.is_available():
+            assert pick_device("auto", n_sensors=64).type == "mps"
+            assert pick_device("gpu").type == "mps"

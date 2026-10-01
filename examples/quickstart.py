@@ -1,6 +1,6 @@
 """End-to-end S-BSTN in Python: simulate -> train -> forecast -> inspect attention.
 
-    python examples/quickstart.py            # ~2 min on a laptop CPU
+    python examples/quickstart.py            # ~7 min on a laptop CPU
 """
 from pathlib import Path
 
@@ -13,7 +13,8 @@ from sbstn.train import build_dataset, model_kwargs, run
 
 OUT = Path("runs/example")
 
-# 1. A 12-link chain crossed by storms moving east at 30 km/h.
+# 1. A 16-link chain over 45 km crossed by storms moving east at 30 km/h: the
+#    regime S-BSTN is built for (see configs/quickstart.yaml).
 cfg = load("configs/quickstart.yaml")
 sim = simulate(cfg.sim)
 print(f"simulated {sim['x_obs'].shape[0]} links, wet {sim['wet_mask'].mean():.1%} of the time")
@@ -45,7 +46,9 @@ viz.plot_spatial_attention(sim["links"], lam, storm_dir_deg=cfg.sim.storm_dir_de
 viz.plot_temporal_attention(attn["pi_fwd"], attn["pi_bwd"], fc.dt_min,
                             path=OUT / "temporal_attention.png")
 viz.plot_spatiotemporal_structure(sim, path=OUT / "spatiotemporal_structure.png")
-k = int(np.argmax(test["y_db"].max(-1).max(-1) - test["x_db"][..., -1].max(-1)))
+w_idx = np.flatnonzero(test["wet"])                # strongest wet event in the test set
+swing = np.concatenate([test["x_db"], test["y_db"]], -1)
+k = int(w_idx[np.argmax((swing.max(-1) - swing.min(-1)).max(-1)[w_idx])])
 viz.plot_forecast(test["x_db"][k], test["y_db"][k], test["pred_db"][k],
                   path=OUT / "forecast.png")
 print(f"figures in {OUT}/")

@@ -163,11 +163,40 @@ def plot_network(links, extent_km=None, storm_dir_deg=None, title=None, path=Non
     return _finish(fig or ax.figure, path)
 
 
+def _pick_event(r, along, half, n_show, n_candidates=10, min_frac=0.2):
+    """Index of the event whose lead-lag is easiest to see.
+
+    Candidates are the strongest well-separated rain peaks (network-total rain
+    at least `min_frac` of the strongest). Among those whose most-hit links
+    peak in upwind -> downwind order, take the one with the widest spread of
+    peak times.
+    """
+    tot = np.convolve(r.sum(0), np.ones(30) / 30, mode="same")
+    peaks = []
+    for p in np.argsort(-tot):
+        if tot[p] <= 0 or len(peaks) >= n_candidates:
+            break
+        if all(abs(p - q) > 2 * half for q in peaks):
+            peaks.append(int(p))
+    best, best_spread = peaks[0], -1.0
+    for p in peaks:
+        if tot[p] < min_frac * tot[peaks[0]]:
+            continue
+        seg = r[:, max(0, p - half):p + half]
+        hit = sorted(np.argsort(-seg.max(1))[:n_show], key=lambda i: along[i])
+        tp = np.array([seg[i].argmax() for i in hit], dtype=float)
+        if np.all(np.diff(tp) >= 0) and tp[-1] - tp[0] > best_spread:
+            best, best_spread = p, tp[-1] - tp[0]
+    return best
+
+
 def plot_event(sim, path=None, event_idx=None, n_show=4):
     """A rain event crossing the network: geometry + the signals it leaves.
 
-    The links shown are ordered along the storm direction, so the lead-lag that
-    spatial attention has to discover is visible directly in the traces.
+    The links shown are ordered along the storm direction and drawn as excess
+    attenuation over their own dry level, so the lead-lag that spatial
+    attention has to discover is visible directly in the traces. By default
+    the event with the clearest lead-lag is chosen (see _pick_event).
     """
     style()
     cfg = sim["config"]
@@ -178,21 +207,21 @@ def plot_event(sim, path=None, event_idx=None, n_show=4):
                  title=f"(a) {cfg['topology']} network, N = {len(links)}", ax=axes[0])
 
     x, r = sim["x_obs"], sim["r_true"]
-    if event_idx is None:
-        event_idx = int(np.argmax(r.sum(0)))
     half = int(45 * 60 / cfg["dt_s"])
+    along = _mids(links) @ _unit(cfg["storm_dir_deg"])
+    if event_idx is None:
+        event_idx = _pick_event(r, along, half, n_show)
     lo, hi = max(0, event_idx - half), min(x.shape[1], event_idx + half)
     t = (np.arange(lo, hi) - event_idx) * cfg["dt_s"] / 60.0
-    m = _mids(links)
-    u = _unit(cfg["storm_dir_deg"])
     hit = np.argsort(-r[:, lo:hi].max(1))[:n_show]
-    hit = sorted(hit, key=lambda i: m[i] @ u)
+    hit = sorted(hit, key=lambda i: along[i])
     ax = axes[1]
     for k, i in enumerate(hit):
-        ax.plot(t, x[i, lo:hi], color=SERIES[k], lw=1.5, label=f"link {i}")
+        xi = x[i, lo:hi]
+        ax.plot(t, xi - np.percentile(xi, 10), color=SERIES[k], lw=1.5, label=f"link {i}")
         axes[0].plot(*zip(links[i]["a"], links[i]["b"]), color=SERIES[k], lw=3.2, zorder=2)
     ax.legend(ncol=n_show, loc="upper left", bbox_to_anchor=(0, 1.02))
-    _ax(ax, "time relative to event peak [min]", "attenuation [dB]",
+    _ax(ax, "time relative to event peak [min]", "attenuation above dry level [dB]",
         "(b) observed signals, ordered upwind → downwind")
     fig.tight_layout()
     return _finish(fig, path)
@@ -263,10 +292,16 @@ def plot_spatiotemporal_structure(sim, path=None, max_lag_min=30.0, max_steps=20
     dist = np.linalg.norm(d, axis=-1)
     ax.scatter(dist[off], peak[off], s=10, color=SERIES[0], alpha=0.45, linewidths=0,
                label="link pairs")
-    sig = float(np.mean(cfg["cell_sigma_km"]))
+    # Fit the decay scale to the pairs shown rather than drawing the cells'
+    # nominal sigma: path averaging and advection along the chain keep link
+    # correlation higher than a single static cell of mean size would.
+    ok = off & np.isfinite(peak)
+    grid = np.linspace(0.5, 4 * dist[ok].max(), 400)
+    sse = [np.sum((peak[ok] - np.exp(-dist[ok] ** 2 / (4 * g ** 2))) ** 2) for g in grid]
+    sig = float(grid[int(np.argmin(sse))])
     dd = np.linspace(0, dist[off].max(), 100)
     ax.plot(dd, np.exp(-dd ** 2 / (4 * sig ** 2)), color=INK_2, lw=1.2, ls="--",
-            label=f"Gaussian cell overlap, σ = {sig:g} km")
+            label=f"Gaussian fit, σ = {sig:.1f} km")
     ax.set_ylim(min(0, np.nanmin(peak[off])), 1.02)
     ax.legend(loc="upper right")
     _ax(ax, "link separation [km]", "peak lagged correlation",
@@ -357,7 +392,10 @@ def plot_temporal_attention(pi_fwd, pi_bwd=None, dt_min=0.5, path=None):
     for ax, (p, t) in zip(axes[0], mats):
         im = ax.imshow(p, cmap=SEQ, aspect="auto", vmin=0, vmax=vmax, extent=ext)
         _ax(ax, "past step [min relative to now]", "forecast lead [min]", t, grid=None)
-    _colorbar(fig, im, axes[0][-1], "attention π")
+    cb = _colorbar(fig, im, axes[0][-1], "attention π")
+    # A flat panel at this level means the pass weights every past step equally.
+    cb.ax.axhline(1.0 / T, color=INK, lw=1.5)
+    cb.set_ticks([0, 1.0 / T, vmax], labels=["0", "1/T (uniform)", f"{vmax:.2f}"])
     fig.tight_layout()
     return _finish(fig, path)
 
