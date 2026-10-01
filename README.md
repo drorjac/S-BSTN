@@ -21,6 +21,11 @@ subnetwork, using only the links' own past measurements.** It uses no radar, no 
 weather model and no rain gauges at inference time. The forecast attenuation can then be
 converted into a short-term rain map.
 
+| | Shape | Meaning |
+|---|---|---|
+| **Input** | `(N, T)` | a multivariate time series: the last `T` attenuation samples [dB] of each of the `N` links, evenly sampled (default 24 steps of 30 s = 12 min) |
+| **Output** | `(N, H)` | the next `H` samples [dB] for every link (default 10 steps = 5 min) |
+
 This repository is the reference implementation of:
 
 > D. Jacoby, H. Messer, and J. Ostrometzky, "Spatio-Temporal Model for Predicting Multivariate
@@ -157,6 +162,7 @@ y = model(x)                        # (B, N, T) -> (B, N, H), min-max scaled uni
 
 [`examples/quickstart.py`](examples/quickstart.py) walks through the whole pipeline in Python:
 simulation, balancing, training, saving, forecasting and attention maps.
+Example notebooks and baseline comparisons will be added in a future release.
 
 ## Visualisation
 
@@ -232,14 +238,15 @@ The tests check the invariants that are easy to break silently:
 ## Citation
 
 ```bibtex
-@article{jacoby2025sbstn,
-  author  = {Jacoby, Dror and Messer, Hagit and Ostrometzky, Jonatan},
-  title   = {Spatio-Temporal Model for Predicting Multivariate Weather-Induced Attenuation in Wireless Networks},
-  journal = {IEEE Transactions on Instrumentation and Measurement},
-  volume  = {74},
-  pages   = {1--13},
-  year    = {2025},
-  doi     = {10.1109/TIM.2025.3555716}
+@article{jacoby2025spatio,
+  title     = {Spatio-Temporal Model for Predicting Multivariate Weather-Induced Attenuation in Wireless Networks},
+  author    = {Jacoby, Dror and Messer, Hagit and Ostrometzky, Jonatan},
+  journal   = {IEEE Transactions on Instrumentation and Measurement},
+  volume    = {74},
+  pages     = {1--13},
+  year      = {2025},
+  publisher = {IEEE},
+  doi       = {10.1109/TIM.2025.3555716}
 }
 ```
 

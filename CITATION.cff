@@ -22,6 +22,8 @@ preferred-citation:
       given-names: Jonatan
       orcid: "https://orcid.org/0000-0003-4750-8656"
   journal: "IEEE Transactions on Instrumentation and Measurement"
+  publisher:
+    name: "IEEE"
   volume: 74
   start: 1
   end: 13
